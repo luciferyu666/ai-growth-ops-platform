@@ -8,19 +8,25 @@ The target is to run the FastAPI service, managed PostgreSQL, and either managed
 
 ## Current State
 
-The production frontend is live:
+The production Services deployment is live:
 
 - Web: `https://ai-growth-ops-platform.vercel.app`
 - Vercel project: `vincent-lius-projects-de5eeb92/ai-growth-ops-platform`
-- Current Vercel root directory: `apps/web`
-- Current framework preset: Next.js
+- Current Vercel root directory: repository root
+- Current framework preset: Services
+- API health: `https://ai-growth-ops-platform.vercel.app/api/health`
+- API deep health: `https://ai-growth-ops-platform.vercel.app/api/health/deep`
 
-The backend and persistence layer still run locally through Docker Compose:
+The backend and persistence layer now run in the proposal production deployment:
 
-- FastAPI: `apps/api`
-- PostgreSQL: local Compose service
-- Redis: local Compose service
-- Celery: local Compose worker
+- FastAPI: Vercel API service under `/api`
+- PostgreSQL: managed Neon through Vercel Marketplace
+- Queue mode: database-backed workflow fallback
+- Redis: intentionally deferred
+- Celery: local development worker only
+
+The completed cutover execution record is tracked in
+`Documentations/15-deploy-002b-managed-postgresql-services-cutover.md`.
 
 ## Deployment Architecture
 
@@ -53,13 +59,15 @@ flowchart LR
 - Added `WORKFLOW_QUEUE_MODE=database` fallback so production demos can operate without Redis while managed Redis is pending.
 - Updated `/health` and `/health/deep` to expose queue mode and avoid hard 500s when production persistence is not configured.
 
-## Required Vercel Project Changes
+## Vercel Project Configuration
 
-To activate the multi-service deployment, the current Vercel project must move from a frontend-only configuration to Services:
+The multi-service deployment requires:
 
 - Root Directory: repository root, not `apps/web`
 - Framework Preset: Services
 - Build source: GitHub `main`
+
+These settings were applied during `DEPLOY-002B`.
 
 Expected service routes after activation:
 
@@ -69,11 +77,11 @@ Expected service routes after activation:
 - Deep health: `/api/health/deep`
 - Workspace API: `/api/workspace/...`
 
-## Required Managed Resources
+## Managed Resources
 
 ### PostgreSQL
 
-Preferred path:
+Provisioned path:
 
 - Vercel Marketplace Neon Postgres
 
@@ -83,7 +91,7 @@ Required env for the API:
 - `POSTGRES_URL`, or
 - `POSTGRES_URL_NON_POOLING`
 
-After provisioning, run:
+Migrations were applied during `DEPLOY-002B`. For future schema changes, run:
 
 ```powershell
 cd apps/api
@@ -176,4 +184,4 @@ Vercel Services can host the API request runtime. A persistent Celery worker sho
 
 ## Recommended Next Step
 
-Provision managed PostgreSQL, choose Redis vs DB-backed workflow fallback, then switch the Vercel project from `apps/web` root to repository root with the Services framework preset.
+Add controlled production demo seed/reset tooling so the cloud-backed workspace can be shown with repeatable non-zero data without manually mutating production records.

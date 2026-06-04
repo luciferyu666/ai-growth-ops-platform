@@ -2,128 +2,110 @@
 
 ## Purpose
 
-`DEPLOY-002B` moves the Technical Proposal Demo from a frontend-only Vercel deployment toward a cloud-backed SaaS demo with:
+`DEPLOY-002B` moves the Technical Proposal Demo from a frontend-only Vercel deployment to a cloud-backed SaaS demo with:
 
 - FastAPI deployed as a Vercel API service under `/api`
 - Managed PostgreSQL for persistent workspace data and audit events
 - DB-backed workflow fallback instead of Redis for the first production demo cutover
 - Frontend API calls routed to the production API service
 
-## Current Execution Status
+## Final Status
 
-Completed:
+Status: completed
 
-- Linked the local repository to `vincent-lius-projects-de5eeb92/ai-growth-ops-platform`.
-- Verified current Vercel project settings:
-  - Root Directory: `apps/web`
-  - Framework Preset: Next.js
-  - Node.js Version: 24.x
-- Verified no managed Marketplace resources are currently connected.
-- Confirmed production env did not yet include `DATABASE_URL`, `POSTGRES_URL`, or `REDIS_URL`.
-- Added production fallback runtime env:
+Production URLs:
+
+- Web: `https://ai-growth-ops-platform.vercel.app`
+- API health: `https://ai-growth-ops-platform.vercel.app/api/health`
+- API deep health: `https://ai-growth-ops-platform.vercel.app/api/health/deep`
+- Proposal API: `https://ai-growth-ops-platform.vercel.app/api/proposal/demo`
+- Workspace API: `https://ai-growth-ops-platform.vercel.app/api/workspace/metrics`
+
+Production deployment:
+
+- Deployment URL: `https://ai-growth-ops-platform-4lw0p5tv9-vincent-lius-projects-de5eeb92.vercel.app`
+- Deployment ID: `dpl_CfC2jiVvKA2nK7NVGfB2o3xRydLj`
+- Vercel project: `vincent-lius-projects-de5eeb92/ai-growth-ops-platform`
+- Framework Preset: Services
+- Root Directory: repository root
+
+Managed PostgreSQL:
+
+- Provider: Neon through Vercel Marketplace
+- Resource name: `ai-growth-ops-platform-postgres`
+- Resource ID: `store_glFBoYv5H5lQJSYz`
+- External resource ID: `lucky-rain-17272464`
+- Plan: `free_v3`
+- Region: `iad1`
+- Connected environments: production, preview, development
+
+Migration:
+
+- Alembic revision: `20260604_0005`
+- Table count: 15
+- Tables:
+  - `alembic_version`
+  - `approval_records`
+  - `approval_snapshots`
+  - `audit_events`
+  - `background_jobs`
+  - `consent_records`
+  - `contacts`
+  - `content_drafts`
+  - `notification_outbox`
+  - `operational_events`
+  - `organizations`
+  - `users`
+  - `workspace_invitations`
+  - `workspace_memberships`
+  - `workspaces`
+
+## Completed Work
+
+- Accepted Neon Marketplace terms in the Vercel browser flow.
+- Provisioned Neon through Vercel Marketplace.
+- Pulled production environment variables to `.env.production.local`.
+- Verified production env includes `DATABASE_URL`, `POSTGRES_URL`, and `POSTGRES_URL_NON_POOLING`.
+- Ran Alembic migrations against managed PostgreSQL from the Docker API container.
+- Verified the managed PostgreSQL schema and migration revision.
+- Set production workflow fallback env:
   - `APP_ENV=production`
   - `WORKFLOW_QUEUE_MODE=database`
   - `REDIS_REQUIRED=false`
-- Added development fallback runtime env:
-  - `APP_ENV=development`
-  - `WORKFLOW_QUEUE_MODE=database`
-  - `REDIS_REQUIRED=false`
-- Updated frontend API URL priority so Vercel Services generated variables win:
-  - Server-side: `API_URL` before `API_INTERNAL_BASE_URL`
-  - Browser-side: `NEXT_PUBLIC_API_URL` before `NEXT_PUBLIC_API_BASE_URL`
+- Updated Vercel project settings:
+  - Root Directory: repository root
+  - Framework Preset: Services
+  - Build Command: none
+  - Install Command: none
+  - Output Directory: none
+- Deployed production from the repository root.
+- Verified production web routes return 200:
+  - `/`
+  - `/proposal`
+  - `/workspace`
+- Verified production API routes:
+  - `/api/health`
+  - `/api/health/deep`
+  - `/api/proposal/demo`
+  - `/api/workspace/metrics`
+- Verified production error logs show no critical runtime errors.
 
-Blocked:
+## Health Results
 
-- Neon Marketplace provisioning requires marketplace terms acceptance by the account owner.
-- The CLI returned `integration_terms_acceptance_required`.
-- This is a legal/account action and must be completed manually in the Vercel browser session.
+`GET /api/health`:
 
-## Manual Action Required
-
-Open the Vercel Neon terms acceptance URL and accept the terms if the account owner agrees:
-
-```text
-https://vercel.com/vincent-lius-projects-de5eeb92/~/integrations/accept-terms/neon?source=cli
+```json
+{
+  "status": "ok",
+  "service": "api",
+  "environment": "production",
+  "database_configured": true,
+  "redis_configured": false,
+  "workflow_queue_mode": "database"
+}
 ```
 
-Policy links returned by Vercel:
-
-- Vercel Marketplace Addendum: `https://vercel.com/legal/integration-marketplace-end-users-addendum`
-- Neon Privacy Policy: `https://neon.tech/privacy-policy`
-- Neon Terms of Service: `https://neon.tech/terms-of-service`
-
-After terms are accepted, retry:
-
-```powershell
-vercel integration add neon `
-  --plan free_v3 `
-  --name ai-growth-ops-platform-postgres `
-  -m region=iad1 `
-  -m auth=false `
-  -e production `
-  -e preview `
-  -e development `
-  --format=json `
-  --scope vincent-lius-projects-de5eeb92
-```
-
-## Redis Decision
-
-For this cutover, use DB-backed workflow fallback instead of provisioning Redis.
-
-Reason:
-
-- MVP-006 and MVP-007 already persist workflow jobs, notification outbox rows, retry state, and operational events in PostgreSQL.
-- The Technical Proposal Demo needs deterministic cloud persistence more than continuously running workers.
-- This avoids adding a second managed provider before the backend service and database are proven in production.
-
-Redis can be added later through Upstash or Redis Marketplace when a persistent background worker runtime is selected.
-
-## Cutover Steps After Neon Provisioning
-
-1. Pull production environment variables:
-
-```powershell
-vercel env pull .env.production.local --environment=production --yes --scope vincent-lius-projects-de5eeb92
-```
-
-2. Verify managed Postgres variables exist locally without printing secrets:
-
-```powershell
-Select-String -Path .env.production.local -Pattern "^(DATABASE_URL|POSTGRES_URL|POSTGRES_URL_NON_POOLING)="
-```
-
-3. Run Alembic migration against managed PostgreSQL:
-
-```powershell
-Push-Location apps/api
-$env:APP_ENV = "production"
-python -m alembic upgrade head
-python -m alembic current
-Pop-Location
-```
-
-4. Change Vercel project settings:
-
-```text
-Root Directory: repository root
-Framework Preset: Services
-```
-
-5. Deploy production from `main`:
-
-```powershell
-vercel --prod --scope vincent-lius-projects-de5eeb92
-```
-
-6. Validate production API:
-
-```powershell
-Invoke-WebRequest -Uri "https://ai-growth-ops-platform.vercel.app/api/health" -UseBasicParsing
-Invoke-WebRequest -Uri "https://ai-growth-ops-platform.vercel.app/api/health/deep" -UseBasicParsing
-```
-
-Expected deep health:
+`GET /api/health/deep`:
 
 ```json
 {
@@ -137,19 +119,33 @@ Expected deep health:
 }
 ```
 
-7. Validate frontend workflow:
+## Redis Decision
 
-- `/` loads proposal dashboard.
-- `/proposal` loads Technical Proposal Demo.
-- `/workspace` loads API-backed metrics.
-- Creating a demo organization writes to managed PostgreSQL.
-- Audit events are created for mutations.
+For this cutover, Redis remains deferred and the production demo uses DB-backed workflow fallback.
 
-## Do Not Cut Over Before These Are True
+Reason:
 
-- Neon terms are accepted and the managed database is provisioned.
-- `DATABASE_URL` or `POSTGRES_URL` exists in Vercel production env.
-- Alembic migration succeeds against managed PostgreSQL.
-- Vercel Services framework preset is selected.
+- MVP-006 and MVP-007 already persist workflow jobs, notification outbox rows, retry state, and operational events in PostgreSQL.
+- The Technical Proposal Demo needs deterministic cloud persistence more than continuously running workers.
+- This avoids adding a second managed provider before the backend service and database are proven in production.
 
-Cutting over before these checks would likely produce a partially working frontend with failing `/api/health/deep` and broken workspace mutations.
+Redis can be added later through Upstash or Redis Marketplace when a persistent background worker runtime is selected.
+
+## Acceptance Criteria
+
+- Vercel production deployment uses Services: completed.
+- `GET /api/health` returns `status: ok`: completed.
+- `GET /api/health/deep` returns database `ok`: completed.
+- Queue check returns database queue fallback `ok`: completed.
+- Alembic migrations have run against managed PostgreSQL: completed.
+- `/workspace` loads from the production deployment: completed.
+- Dashboard and workspace API calls can reach production API under `/api`: completed.
+- Production error logs show no critical runtime failures: completed.
+
+## Remaining Production Hardening
+
+- Add a managed Redis provider only when a persistent worker runtime is selected.
+- Add production seed/demo reset tooling for controlled proposal demos.
+- Add observability drains or external log retention.
+- Add Auth0 production tenant secrets before external users access the workspace.
+- Add backup and retention policy documentation for Neon.

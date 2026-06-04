@@ -56,6 +56,8 @@ The project now has an executable SaaS-shaped MVP foundation:
 - Notification provider adapter boundary
 - Retry scheduling, dead-letter handling, and operations alert thresholds
 - Vercel Services readiness for production web/API deployment
+- Cloud-backed Vercel Services deployment with FastAPI under `/api`
+- Managed Neon PostgreSQL production persistence
 - Production API configuration support for managed PostgreSQL and DB-backed workflow fallback
 
 ## Local Development
@@ -106,15 +108,15 @@ Current public frontend:
 
 Current production status:
 
-- The Next.js frontend is deployed on Vercel.
-- DEPLOY-002 readiness has been added for a future Vercel Services deployment with FastAPI under `/api`.
-- DEPLOY-002B has prepared production DB-backed workflow fallback env values.
-- Managed PostgreSQL provisioning is pending Vercel Marketplace terms acceptance for Neon.
-- Managed Redis is intentionally deferred; the first cloud backend demo will use the DB-backed workflow fallback.
-- The production backend is not considered fully cloud-backed until managed persistence is provisioned and Alembic migrations run against it.
+- Vercel project is configured as Services from the repository root.
+- Next.js web is deployed at `/`.
+- FastAPI is deployed under `/api`.
+- Managed Neon PostgreSQL is provisioned and migrated to revision `20260604_0005`.
+- Production `/api/health` and `/api/health/deep` return `ok`.
+- Managed Redis is intentionally deferred; the cloud demo uses the DB-backed workflow fallback.
 
 See `Documentations/14-deploy-002-production-backend-managed-persistence.md` for the deployment plan and acceptance criteria.
-See `Documentations/15-deploy-002b-managed-postgresql-services-cutover.md` for the current cutover execution record and manual Neon acceptance step.
+See `Documentations/15-deploy-002b-managed-postgresql-services-cutover.md` for the completed managed PostgreSQL and Services cutover record.
 
 Run lightweight checks:
 
