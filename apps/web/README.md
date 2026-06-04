@@ -17,3 +17,9 @@ npm run dev
 ```
 
 This app uses the App Router, TypeScript, Tailwind CSS, and Next.js 16.
+
+## Production Demo
+
+- URL: https://ai-growth-ops-platform.vercel.app
+- Purpose: Technical Proposal Demo and compliant productization showcase.
+- Vercel root directory: `apps/web`
