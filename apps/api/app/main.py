@@ -96,6 +96,7 @@ async def health() -> dict[str, bool | str]:
         "environment": settings.app_env,
         "database_configured": bool(settings.database_url),
         "redis_configured": bool(settings.redis_url),
+        "workflow_queue_mode": settings.workflow_queue_mode,
     }
 
 
@@ -107,20 +108,27 @@ def deep_health(response: Response) -> dict[str, Any]:
         with get_engine().connect() as connection:
             connection.execute(text("SELECT 1")).scalar_one()
         checks["database"] = {"status": "ok"}
-    except SQLAlchemyError as exc:
+    except (RuntimeError, SQLAlchemyError) as exc:
         checks["database"] = {"status": "error", "detail": exc.__class__.__name__}
 
-    try:
-        redis_client = Redis.from_url(
-            settings.redis_url,
-            socket_connect_timeout=2,
-            socket_timeout=2,
-            decode_responses=True,
-        )
-        redis_client.ping()
-        checks["redis"] = {"status": "ok"}
-    except RedisError as exc:
-        checks["redis"] = {"status": "error", "detail": exc.__class__.__name__}
+    if settings.workflow_queue_mode == "database" and not settings.redis_url:
+        checks["queue"] = {"status": "ok", "mode": "database"}
+    elif settings.redis_url:
+        try:
+            redis_client = Redis.from_url(
+                settings.redis_url,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+                decode_responses=True,
+            )
+            redis_client.ping()
+            checks["redis"] = {"status": "ok", "mode": "redis"}
+        except RedisError as exc:
+            checks["redis"] = {"status": "error", "detail": exc.__class__.__name__}
+    elif settings.redis_required:
+        checks["redis"] = {"status": "error", "detail": "Redis URL is required"}
+    else:
+        checks["queue"] = {"status": "ok", "mode": "database"}
 
     is_ok = all(check["status"] == "ok" for check in checks.values())
     if not is_ok:

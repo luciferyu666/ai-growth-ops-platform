@@ -55,6 +55,8 @@ The project now has an executable SaaS-shaped MVP foundation:
 - Workspace operations panel for workflow processing visibility
 - Notification provider adapter boundary
 - Retry scheduling, dead-letter handling, and operations alert thresholds
+- Vercel Services readiness for production web/API deployment
+- Production API configuration support for managed PostgreSQL and DB-backed workflow fallback
 
 ## Local Development
 
@@ -93,6 +95,23 @@ Service URLs:
 - API docs: `http://localhost:8000/docs`
 - PostgreSQL: `localhost:5433`
 - Redis: `localhost:6379`
+
+## Production Demo
+
+Current public frontend:
+
+- Web: `https://ai-growth-ops-platform.vercel.app`
+- Technical Proposal Demo: `https://ai-growth-ops-platform.vercel.app/proposal`
+- MVP Workspace UI: `https://ai-growth-ops-platform.vercel.app/workspace`
+
+Current production status:
+
+- The Next.js frontend is deployed on Vercel.
+- DEPLOY-002 readiness has been added for a future Vercel Services deployment with FastAPI under `/api`.
+- Managed PostgreSQL and Redis are not yet provisioned in this repository.
+- The production backend is not considered fully cloud-backed until managed persistence is provisioned and Alembic migrations run against it.
+
+See `Documentations/14-deploy-002-production-backend-managed-persistence.md` for the deployment plan and acceptance criteria.
 
 Run lightweight checks:
 

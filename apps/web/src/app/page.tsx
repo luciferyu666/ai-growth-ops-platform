@@ -1,15 +1,13 @@
 import { HomeClient, type WorkspaceMetrics } from "./home-client";
+import { buildApiUrl, getServerApiBaseUrl } from "@/lib/api-base-url";
 
 export const dynamic = "force-dynamic";
 
 async function getWorkspaceMetrics(): Promise<WorkspaceMetrics> {
-  const apiBaseUrl =
-    process.env.API_INTERNAL_BASE_URL ??
-    process.env.NEXT_PUBLIC_API_BASE_URL ??
-    "http://localhost:8000";
+  const apiBaseUrl = getServerApiBaseUrl();
 
   try {
-    const response = await fetch(`${apiBaseUrl}/workspace/metrics`, {
+    const response = await fetch(buildApiUrl(apiBaseUrl, "/workspace/metrics"), {
       cache: "no-store",
     });
 

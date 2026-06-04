@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { buildApiUrl, getPublicApiBaseUrl } from "@/lib/api-base-url";
 
 type Metrics = {
   organizations: number;
@@ -250,8 +251,7 @@ const emptyMetrics: Metrics = {
   audit_events: 0,
 };
 
-const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const apiBaseUrl = getPublicApiBaseUrl();
 const authProvider = process.env.NEXT_PUBLIC_AUTH_PROVIDER ?? "demo-header";
 
 const demoUserEmail = "operator@ai-growth-ops.local";
@@ -301,7 +301,7 @@ async function apiRequest<T>(
 ): Promise<T> {
   const auth0Headers =
     authProvider === "auth0" ? await getAuth0BearerHeaders() : {};
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const response = await fetch(buildApiUrl(apiBaseUrl, path), {
     ...options,
     headers: {
       "Content-Type": "application/json",

@@ -1,4 +1,5 @@
 import { ProposalClient, type ProposalDemo } from "./proposal-client";
+import { buildApiUrl, getServerApiBaseUrl } from "@/lib/api-base-url";
 
 type ProposalResponse = {
   data: ProposalDemo;
@@ -129,13 +130,10 @@ const fallbackProposal: ProposalDemo = {
 };
 
 async function getProposalDemo(): Promise<ProposalResponse> {
-  const apiBaseUrl =
-    process.env.API_INTERNAL_BASE_URL ??
-    process.env.NEXT_PUBLIC_API_BASE_URL ??
-    "http://localhost:8000";
+  const apiBaseUrl = getServerApiBaseUrl();
 
   try {
-    const response = await fetch(`${apiBaseUrl}/proposal/demo`, {
+    const response = await fetch(buildApiUrl(apiBaseUrl, "/proposal/demo"), {
       cache: "no-store",
     });
 

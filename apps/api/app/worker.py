@@ -8,11 +8,13 @@ from app.models import BackgroundJob
 from app.services.operations import process_notification_job
 
 settings = get_settings()
+broker_url = settings.redis_url or "memory://"
+result_backend = settings.redis_url or "cache+memory://"
 
 celery_app = Celery(
     "ai_growth_ops",
-    broker=settings.redis_url,
-    backend=settings.redis_url,
+    broker=broker_url,
+    backend=result_backend,
 )
 
 celery_app.conf.update(

@@ -20,6 +20,8 @@ The notification outbox and operational events foundation has been accepted in `
 
 The notification provider adapter, retry policy, and alert thresholds have been accepted in `Documentations/decisions/ADR-0011-notification-provider-retry-and-alert-policy.md`.
 
+The production backend and managed persistence deployment plan is tracked in `Documentations/14-deploy-002-production-backend-managed-persistence.md`.
+
 ## Candidate System Areas
 
 - Next.js web application for operators and administrators
@@ -38,6 +40,9 @@ The notification provider adapter, retry policy, and alert thresholds have been 
 - Operational events and structured request logging layer
 - Notification provider adapter and retry/dead-letter workflow layer
 - Operations monitor alert threshold layer
+- Vercel Services web/API deployment layer
+- Managed PostgreSQL production persistence layer
+- DB-backed workflow fallback for proposal deployments without managed Redis
 
 ## Candidate Data Domains
 
@@ -69,5 +74,6 @@ The notification provider adapter, retry policy, and alert thresholds have been 
 - Notification provider webhook ingestion
 - Notification template governance
 - LLM provider abstraction
-- Deployment target
+- Managed PostgreSQL provider and production migration execution
+- Managed Redis vs DB-backed workflow fallback
 - Observability stack

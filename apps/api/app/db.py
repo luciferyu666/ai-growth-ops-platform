@@ -15,6 +15,8 @@ class Base(DeclarativeBase):
 @lru_cache
 def get_engine() -> Engine:
     settings = get_settings()
+    if not settings.database_url:
+        raise RuntimeError("DATABASE_URL or POSTGRES_URL is required")
     return create_engine(settings.database_url, pool_pre_ping=True)
 
 
