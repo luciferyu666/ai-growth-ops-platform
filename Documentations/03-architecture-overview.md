@@ -22,6 +22,8 @@ The notification provider adapter, retry policy, and alert thresholds have been 
 
 The production backend and managed persistence deployment plan is tracked in `Documentations/14-deploy-002-production-backend-managed-persistence.md`.
 
+The managed PostgreSQL and Vercel Services cutover execution record is tracked in `Documentations/15-deploy-002b-managed-postgresql-services-cutover.md`.
+
 ## Candidate System Areas
 
 - Next.js web application for operators and administrators
@@ -75,5 +77,5 @@ The production backend and managed persistence deployment plan is tracked in `Do
 - Notification template governance
 - LLM provider abstraction
 - Managed PostgreSQL provider and production migration execution
-- Managed Redis vs DB-backed workflow fallback
+- Managed Redis provider selection after the DB-backed proposal deployment is stable
 - Observability stack

@@ -108,10 +108,13 @@ Current production status:
 
 - The Next.js frontend is deployed on Vercel.
 - DEPLOY-002 readiness has been added for a future Vercel Services deployment with FastAPI under `/api`.
-- Managed PostgreSQL and Redis are not yet provisioned in this repository.
+- DEPLOY-002B has prepared production DB-backed workflow fallback env values.
+- Managed PostgreSQL provisioning is pending Vercel Marketplace terms acceptance for Neon.
+- Managed Redis is intentionally deferred; the first cloud backend demo will use the DB-backed workflow fallback.
 - The production backend is not considered fully cloud-backed until managed persistence is provisioned and Alembic migrations run against it.
 
 See `Documentations/14-deploy-002-production-backend-managed-persistence.md` for the deployment plan and acceptance criteria.
+See `Documentations/15-deploy-002b-managed-postgresql-services-cutover.md` for the current cutover execution record and manual Neon acceptance step.
 
 Run lightweight checks:
 

@@ -44,3 +44,5 @@ data/*
 # Codex/local agent artifacts
 .codex-cache/
 .agent-output/
+
+.vercel
