@@ -59,6 +59,7 @@ The project now has an executable SaaS-shaped MVP foundation:
 - Cloud-backed Vercel Services deployment with FastAPI under `/api`
 - Managed Neon PostgreSQL production persistence
 - Production API configuration support for managed PostgreSQL and DB-backed workflow fallback
+- Production demo seed/reset flow with guarded demo workspace scope
 
 ## Local Development
 
@@ -113,10 +114,12 @@ Current production status:
 - FastAPI is deployed under `/api`.
 - Managed Neon PostgreSQL is provisioned and migrated to revision `20260604_0005`.
 - Production `/api/health` and `/api/health/deep` return `ok`.
+- Production `/workspace` can seed/reset repeatable demo data through guarded demo endpoints.
 - Managed Redis is intentionally deferred; the cloud demo uses the DB-backed workflow fallback.
 
 See `Documentations/14-deploy-002-production-backend-managed-persistence.md` for the deployment plan and acceptance criteria.
 See `Documentations/15-deploy-002b-managed-postgresql-services-cutover.md` for the completed managed PostgreSQL and Services cutover record.
+See `Documentations/16-prod-demo-001-production-demo-seed-reset-flow.md` for the production demo seed/reset workflow.
 
 Run lightweight checks:
 
@@ -158,6 +161,15 @@ Demo roles currently supported:
 - `operator`
 - `reviewer`
 - `viewer`
+
+## Production Demo Data
+
+Production demo data tools are available from `/workspace` for the demo workspaces only:
+
+- `demo-growth-ops`
+- `demo-sandbox`
+
+The `Seed demo data` action creates a non-zero CRM, consent, approved content draft, approval snapshot, and audit trail without duplicating existing demo records. The `Reset & seed demo` action clears the current demo workspace records and rebuilds the same compliant demonstration data.
 
 ## Database Migrations
 

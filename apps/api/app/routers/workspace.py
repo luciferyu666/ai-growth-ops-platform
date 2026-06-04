@@ -2,11 +2,12 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.config import Settings, get_settings
 from app.db import get_session
 from app.models import (
     ApprovalRecord,
@@ -157,6 +158,9 @@ class ReviewNotificationCreate(BaseModel):
     subject: str | None = Field(default=None, max_length=255)
     body: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+PRODUCTION_DEMO_WORKSPACE_SLUGS = {"demo-growth-ops", "demo-sandbox"}
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -450,6 +454,239 @@ def _paginated_list(
         limit=limit,
         offset=offset,
     )
+
+
+def _ensure_demo_data_mutation_allowed(auth: AuthContext, settings: Settings) -> None:
+    require_permission(auth, DEMO_RESET)
+    if settings.app_env != "production":
+        return
+    if auth.auth_mode != "demo-header":
+        raise HTTPException(
+            status_code=403,
+            detail="Production demo data tools require demo-header auth mode.",
+        )
+    if auth.workspace_slug not in PRODUCTION_DEMO_WORKSPACE_SLUGS:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "Production demo data tools are limited to demo workspaces.",
+                "allowed_workspaces": sorted(PRODUCTION_DEMO_WORKSPACE_SLUGS),
+            },
+        )
+
+
+def _seed_demo_workspace(
+    *,
+    session: Session,
+    auth: AuthContext,
+    audit_action: str,
+) -> dict[str, Any]:
+    organization = Organization(
+        workspace_id=auth.workspace_id,
+        name="Acme Wellness Clinic",
+        legal_name="Acme Wellness Clinic Ltd.",
+        domain="acme-wellness.example",
+        industry="Healthcare services",
+        status="active",
+        extra_data={"demo": True, "segment": "local-services"},
+    )
+    session.add(organization)
+    session.flush()
+    record_audit_event(
+        session,
+        workspace_id=auth.workspace_id,
+        action="organization.created",
+        actor_id=auth.actor_id,
+        resource_type="organization",
+        resource_id=str(organization.id),
+        metadata={"seed": True, "role": auth.role},
+    )
+
+    contact = Contact(
+        workspace_id=auth.workspace_id,
+        organization_id=organization.id,
+        name="Mia Chen",
+        email="mia.chen@example.com",
+        phone="+886-900-000-001",
+        role="Marketing Manager",
+        source="authorized-demo-import",
+        extra_data={"demo": True},
+    )
+    session.add(contact)
+    session.flush()
+    record_audit_event(
+        session,
+        workspace_id=auth.workspace_id,
+        action="contact.created",
+        actor_id=auth.actor_id,
+        resource_type="contact",
+        resource_id=str(contact.id),
+        metadata={
+            "seed": True,
+            "organization_id": str(organization.id),
+            "role": auth.role,
+        },
+    )
+
+    consent_record = ConsentRecord(
+        workspace_id=auth.workspace_id,
+        contact_id=contact.id,
+        channel="email",
+        status="granted",
+        lawful_basis="consent",
+        source="demo opt-in form",
+        granted_at=datetime.now(timezone.utc),
+        extra_data={"demo": True},
+    )
+    session.add(consent_record)
+    session.flush()
+    record_audit_event(
+        session,
+        workspace_id=auth.workspace_id,
+        action="consent_record.created",
+        actor_id=auth.actor_id,
+        resource_type="consent_record",
+        resource_id=str(consent_record.id),
+        metadata={"seed": True, "contact_id": str(contact.id), "role": auth.role},
+    )
+
+    prompt_text = "Create a compliant follow-up draft for opted-in customers."
+    mock_draft = generate_mock_content_draft(
+        organization_name=organization.name,
+        channel="email",
+        prompt_text=prompt_text,
+    )
+    seed_policy_result = evaluate_content_policy(
+        title="Opt-in review invitation follow-up",
+        channel="email",
+        prompt_text=prompt_text,
+        draft_text=mock_draft.draft_text,
+    ).to_dict()
+    content_draft = ContentDraft(
+        workspace_id=auth.workspace_id,
+        organization_id=organization.id,
+        title="Opt-in review invitation follow-up",
+        channel="email",
+        status="pending_review",
+        prompt_version=mock_draft.prompt_version,
+        prompt_text=prompt_text,
+        draft_text=mock_draft.draft_text,
+        model_name=mock_draft.model_name,
+        created_by_actor=auth.actor_id,
+        model_metadata={
+            **mock_draft.model_metadata,
+            "policy": seed_policy_result,
+            "workflow": {"status": "pending_review"},
+        },
+        extra_data={"demo": True},
+    )
+    session.add(content_draft)
+    session.flush()
+    record_audit_event(
+        session,
+        workspace_id=auth.workspace_id,
+        action="content_draft.created",
+        actor_id=auth.actor_id,
+        resource_type="content_draft",
+        resource_id=str(content_draft.id),
+        metadata={
+            "seed": True,
+            "model_name": mock_draft.model_name,
+            "status": content_draft.status,
+            "policy_status": seed_policy_result["status"],
+            "role": auth.role,
+        },
+    )
+    record_audit_event(
+        session,
+        workspace_id=auth.workspace_id,
+        action="content_draft.policy_evaluated",
+        actor_id=auth.actor_id,
+        resource_type="content_draft",
+        resource_id=str(content_draft.id),
+        metadata={
+            "seed": True,
+            "policy_status": seed_policy_result["status"],
+            "policy_version": seed_policy_result["version"],
+        },
+    )
+
+    approval_record = ApprovalRecord(
+        workspace_id=auth.workspace_id,
+        content_draft_id=content_draft.id,
+        decision="approved",
+        reviewer_actor=auth.actor_id,
+        comment="Approved for demonstration as a human-reviewed draft.",
+        decided_at=datetime.now(timezone.utc),
+        extra_data={"demo": True},
+    )
+    content_draft.status = "approved"
+    session.add(approval_record)
+    session.flush()
+    approval_snapshot = create_approval_snapshot(
+        session,
+        content_draft=content_draft,
+        approval_record=approval_record,
+        policy=seed_policy_result,
+        auth=auth,
+        reviewed_status="pending_review",
+    )
+    session.flush()
+    record_audit_event(
+        session,
+        workspace_id=auth.workspace_id,
+        action="content_draft.approved",
+        actor_id=auth.actor_id,
+        resource_type="content_draft",
+        resource_id=str(content_draft.id),
+        metadata={
+            "seed": True,
+            "approval_record_id": str(approval_record.id),
+            "role": auth.role,
+        },
+    )
+    record_audit_event(
+        session,
+        workspace_id=auth.workspace_id,
+        action="approval_snapshot.created",
+        actor_id=auth.actor_id,
+        resource_type="approval_snapshot",
+        resource_id=str(approval_snapshot.id),
+        metadata={
+            "seed": True,
+            "approval_record_id": str(approval_record.id),
+            "content_draft_id": str(content_draft.id),
+            "decision": approval_record.decision,
+        },
+    )
+    record_audit_event(
+        session,
+        workspace_id=auth.workspace_id,
+        action=audit_action,
+        actor_id=auth.actor_id,
+        resource_type="workspace",
+        resource_id=str(auth.workspace_id),
+        metadata={
+            "seed": True,
+            "workspace_slug": auth.workspace_slug,
+            "role": auth.role,
+        },
+    )
+
+    session.commit()
+
+    return {
+        "status": "ok",
+        "message": "Demo data seeded",
+        "auth_context": _auth_context_dict(auth),
+        "metrics": calculate_workspace_metrics(session, auth.workspace_id),
+        "organization": _organization_dict(organization),
+        "contact": _contact_dict(contact),
+        "consent_record": _consent_record_dict(consent_record),
+        "content_draft": _content_draft_dict(content_draft),
+        "approval_record": _approval_record_dict(approval_record),
+        "approval_snapshot": _approval_snapshot_dict(approval_snapshot),
+    }
 
 
 @router.get("/auth/context")
@@ -1651,204 +1888,44 @@ def list_audit_events(
     )
 
 
+@router.post("/demo/seed")
+def seed_demo_data(
+    session: Session = Depends(get_session),
+    auth: AuthContext = Depends(get_auth_context),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    _ensure_demo_data_mutation_allowed(auth, settings)
+    metrics = calculate_workspace_metrics(session, auth.workspace_id)
+    if metrics["organizations"] > 0 or metrics["content_drafts"] > 0:
+        return {
+            "status": "ok",
+            "message": "Demo data already seeded",
+            "auth_context": _auth_context_dict(auth),
+            "metrics": metrics,
+        }
+    return _seed_demo_workspace(
+        session=session,
+        auth=auth,
+        audit_action="demo_data.seeded",
+    )
+
+
 @router.post("/demo/reset")
 def reset_demo_data(
     session: Session = Depends(get_session),
     auth: AuthContext = Depends(get_auth_context),
+    settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
-    require_permission(auth, DEMO_RESET)
+    _ensure_demo_data_mutation_allowed(auth, settings)
     delete_workspace_records(session, auth.workspace_id)
     session.flush()
-
-    organization = Organization(
-        workspace_id=auth.workspace_id,
-        name="Acme Wellness Clinic",
-        legal_name="Acme Wellness Clinic Ltd.",
-        domain="acme-wellness.example",
-        industry="Healthcare services",
-        status="active",
-        extra_data={"demo": True, "segment": "local-services"},
-    )
-    session.add(organization)
-    session.flush()
-    record_audit_event(
-        session,
-        workspace_id=auth.workspace_id,
-        action="organization.created",
-        actor_id=auth.actor_id,
-        resource_type="organization",
-        resource_id=str(organization.id),
-        metadata={"seed": True, "role": auth.role},
-    )
-
-    contact = Contact(
-        workspace_id=auth.workspace_id,
-        organization_id=organization.id,
-        name="Mia Chen",
-        email="mia.chen@example.com",
-        phone="+886-900-000-001",
-        role="Marketing Manager",
-        source="authorized-demo-import",
-        extra_data={"demo": True},
-    )
-    session.add(contact)
-    session.flush()
-    record_audit_event(
-        session,
-        workspace_id=auth.workspace_id,
-        action="contact.created",
-        actor_id=auth.actor_id,
-        resource_type="contact",
-        resource_id=str(contact.id),
-        metadata={
-            "seed": True,
-            "organization_id": str(organization.id),
-            "role": auth.role,
-        },
-    )
-
-    consent_record = ConsentRecord(
-        workspace_id=auth.workspace_id,
-        contact_id=contact.id,
-        channel="email",
-        status="granted",
-        lawful_basis="consent",
-        source="demo opt-in form",
-        granted_at=datetime.now(timezone.utc),
-        extra_data={"demo": True},
-    )
-    session.add(consent_record)
-    session.flush()
-    record_audit_event(
-        session,
-        workspace_id=auth.workspace_id,
-        action="consent_record.created",
-        actor_id=auth.actor_id,
-        resource_type="consent_record",
-        resource_id=str(consent_record.id),
-        metadata={"seed": True, "contact_id": str(contact.id), "role": auth.role},
-    )
-
-    mock_draft = generate_mock_content_draft(
-        organization_name=organization.name,
-        channel="email",
-        prompt_text="Create a compliant follow-up draft for opted-in customers.",
-    )
-    seed_policy_result = evaluate_content_policy(
-        title="Opt-in review invitation follow-up",
-        channel="email",
-        prompt_text="Create a compliant follow-up draft for opted-in customers.",
-        draft_text=mock_draft.draft_text,
-    ).to_dict()
-    content_draft = ContentDraft(
-        workspace_id=auth.workspace_id,
-        organization_id=organization.id,
-        title="Opt-in review invitation follow-up",
-        channel="email",
-        status="pending_review",
-        prompt_version=mock_draft.prompt_version,
-        prompt_text="Create a compliant follow-up draft for opted-in customers.",
-        draft_text=mock_draft.draft_text,
-        model_name=mock_draft.model_name,
-        created_by_actor=auth.actor_id,
-        model_metadata={
-            **mock_draft.model_metadata,
-            "policy": seed_policy_result,
-            "workflow": {"status": "pending_review"},
-        },
-        extra_data={"demo": True},
-    )
-    session.add(content_draft)
-    session.flush()
-    record_audit_event(
-        session,
-        workspace_id=auth.workspace_id,
-        action="content_draft.created",
-        actor_id=auth.actor_id,
-        resource_type="content_draft",
-        resource_id=str(content_draft.id),
-        metadata={
-            "seed": True,
-            "model_name": mock_draft.model_name,
-            "status": content_draft.status,
-            "policy_status": seed_policy_result["status"],
-            "role": auth.role,
-        },
-    )
-    record_audit_event(
-        session,
-        workspace_id=auth.workspace_id,
-        action="content_draft.policy_evaluated",
-        actor_id=auth.actor_id,
-        resource_type="content_draft",
-        resource_id=str(content_draft.id),
-        metadata={
-            "seed": True,
-            "policy_status": seed_policy_result["status"],
-            "policy_version": seed_policy_result["version"],
-        },
-    )
-
-    approval_record = ApprovalRecord(
-        workspace_id=auth.workspace_id,
-        content_draft_id=content_draft.id,
-        decision="approved",
-        reviewer_actor=auth.actor_id,
-        comment="Approved for demonstration as a human-reviewed draft.",
-        decided_at=datetime.now(timezone.utc),
-        extra_data={"demo": True},
-    )
-    content_draft.status = "approved"
-    session.add(approval_record)
-    session.flush()
-    approval_snapshot = create_approval_snapshot(
-        session,
-        content_draft=content_draft,
-        approval_record=approval_record,
-        policy=seed_policy_result,
+    payload = _seed_demo_workspace(
+        session=session,
         auth=auth,
-        reviewed_status="pending_review",
+        audit_action="demo_data.reset",
     )
-    session.flush()
-    record_audit_event(
-        session,
-        workspace_id=auth.workspace_id,
-        action="content_draft.approved",
-        actor_id=auth.actor_id,
-        resource_type="content_draft",
-        resource_id=str(content_draft.id),
-        metadata={
-            "seed": True,
-            "approval_record_id": str(approval_record.id),
-            "role": auth.role,
-        },
-    )
-    record_audit_event(
-        session,
-        workspace_id=auth.workspace_id,
-        action="approval_snapshot.created",
-        actor_id=auth.actor_id,
-        resource_type="approval_snapshot",
-        resource_id=str(approval_snapshot.id),
-        metadata={
-            "seed": True,
-            "approval_record_id": str(approval_record.id),
-            "content_draft_id": str(content_draft.id),
-            "decision": approval_record.decision,
-        },
-    )
-
-    session.commit()
-
+    payload["message"] = "Demo data reset and seeded"
     return {
-        "status": "ok",
-        "message": "Demo data reset and seeded",
-        "auth_context": _auth_context_dict(auth),
+        **payload,
         "metrics": calculate_workspace_metrics(session, auth.workspace_id),
-        "organization": _organization_dict(organization),
-        "contact": _contact_dict(contact),
-        "consent_record": _consent_record_dict(consent_record),
-        "content_draft": _content_draft_dict(content_draft),
-        "approval_record": _approval_record_dict(approval_record),
-        "approval_snapshot": _approval_snapshot_dict(approval_snapshot),
     }

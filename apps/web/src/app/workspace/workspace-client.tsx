@@ -1017,6 +1017,21 @@ export function WorkspaceClient() {
               onClick={() =>
                 runAction(
                   async () => {
+                    await workspaceRequest("/workspace/demo/seed", {
+                      method: "POST",
+                    });
+                  },
+                  "Demo data seeded",
+                )
+              }
+            >
+              Seed demo data
+            </ActionButton>
+            <ActionButton
+              disabled={isBusy}
+              onClick={() =>
+                runAction(
+                  async () => {
                     await workspaceRequest("/workspace/demo/reset", {
                       method: "POST",
                     });
@@ -1025,7 +1040,7 @@ export function WorkspaceClient() {
                 )
               }
             >
-              Reset demo data
+              Reset & seed demo
             </ActionButton>
             <ActionButton
               disabled={isBusy}

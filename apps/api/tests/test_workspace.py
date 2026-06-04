@@ -56,6 +56,52 @@ def test_demo_reset_seeds_complete_vertical_slice() -> None:
     ] == payload["content_draft"]["draft_text"]
 
 
+def test_demo_seed_is_idempotent_when_records_exist() -> None:
+    client = TestClient(app)
+    headers = _headers(f"prod-demo-seed-{uuid4().hex}")
+
+    first_response = client.post("/workspace/demo/seed", headers=headers)
+    second_response = client.post("/workspace/demo/seed", headers=headers)
+    metrics_response = client.get("/workspace/metrics", headers=headers)
+
+    assert first_response.status_code == 200
+    assert first_response.json()["message"] == "Demo data seeded"
+    assert second_response.status_code == 200
+    assert second_response.json()["message"] == "Demo data already seeded"
+    assert metrics_response.json()["organizations"] == 1
+    assert metrics_response.json()["contacts"] == 1
+    assert metrics_response.json()["content_drafts"] == 1
+    assert metrics_response.json()["approval_records"] == 1
+
+
+def test_production_demo_data_tools_are_limited_to_demo_workspaces(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    get_settings.cache_clear()
+
+    try:
+        client = TestClient(app)
+        blocked_response = client.post(
+            "/workspace/demo/seed",
+            headers=_headers("customer-workspace"),
+        )
+        allowed_response = client.post(
+            "/workspace/demo/seed",
+            headers=_headers("demo-growth-ops"),
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert blocked_response.status_code == 403
+    assert (
+        blocked_response.json()["detail"]["message"]
+        == "Production demo data tools are limited to demo workspaces."
+    )
+    assert allowed_response.status_code == 200
+    assert allowed_response.json()["metrics"]["organizations"] >= 1
+
+
 def test_manual_workspace_vertical_slice_writes_audit_events() -> None:
     client = TestClient(app)
     headers = _headers("mvp002-manual", user_email="qa-reviewer@example.test")

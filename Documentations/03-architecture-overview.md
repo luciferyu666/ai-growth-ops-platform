@@ -24,6 +24,8 @@ The production backend and managed persistence deployment plan is tracked in `Do
 
 The managed PostgreSQL and Vercel Services cutover execution record is tracked in `Documentations/15-deploy-002b-managed-postgresql-services-cutover.md`.
 
+The production demo seed/reset flow is tracked in `Documentations/16-prod-demo-001-production-demo-seed-reset-flow.md`.
+
 ## Candidate System Areas
 
 - Next.js web application for operators and administrators
@@ -45,6 +47,7 @@ The managed PostgreSQL and Vercel Services cutover execution record is tracked i
 - Vercel Services web/API deployment layer
 - Managed PostgreSQL production persistence layer
 - DB-backed workflow fallback for proposal deployments without managed Redis
+- Production demo seed/reset control layer
 
 ## Candidate Data Domains
 
@@ -79,3 +82,4 @@ The managed PostgreSQL and Vercel Services cutover execution record is tracked i
 - Managed PostgreSQL provider and production migration execution
 - Managed Redis provider selection after the DB-backed proposal deployment is stable
 - Observability stack
+- Controlled production demo data lifecycle
