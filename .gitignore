@@ -1,0 +1,46 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Logs and runtime output
+logs/
+*.log
+*.tmp
+*.temp
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+.next/
+out/
+.turbo/
+coverage/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Local data
+data/*
+!data/.gitkeep
+
+# Codex/local agent artifacts
+.codex-cache/
+.agent-output/

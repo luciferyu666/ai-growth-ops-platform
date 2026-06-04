@@ -1,0 +1,20 @@
+{
+  "name": "ai-growth-ops-platform",
+  "private": true,
+  "scripts": {
+    "dev": "docker compose -f infra/docker-compose.yml up --build",
+    "dev:detached": "docker compose -f infra/docker-compose.yml up --build -d",
+    "stop": "docker compose -f infra/docker-compose.yml down",
+    "check": "npm run lint --prefix apps/web && docker compose -f infra/docker-compose.yml config --quiet",
+    "api:lint": "docker compose -f infra/docker-compose.yml exec -T api ruff check .",
+    "api:test": "docker compose -f infra/docker-compose.yml exec -T api pytest",
+    "db:current": "docker compose -f infra/docker-compose.yml exec -T api alembic current",
+    "db:migrate": "docker compose -f infra/docker-compose.yml exec -T api alembic upgrade head",
+    "db:tables": "docker compose -f infra/docker-compose.yml exec -T db psql -U growth_ops -d growth_ops -c \"\\dt\"",
+    "web:dev": "npm run dev --prefix apps/web",
+    "web:build": "npm run build --prefix apps/web"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
